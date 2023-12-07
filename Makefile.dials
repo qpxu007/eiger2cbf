@@ -1,0 +1,25 @@
+# This Makefile was contributed by Graeme Winter (Diamond Light Source)
+# to work in a DIALS build environment
+BASE := $(shell libtbx.python -c 'import libtbx.load_env; print libtbx.env.under_base("")')
+CBF := $(shell libtbx.find_in_repositories cbflib)
+CBFLIB=${CBF}/lib
+BASELIB=${BASE}/lib
+BUILDLIB=$(shell libtbx.find_under_build lib)
+CBFINC=${CBF}/include
+BASEINC=${BASE}/include
+CC=gcc
+all:	
+	${CC} -std=c99 -o eiger2cbf -g \
+	-I${CBFINC} -I${BASEINC} \
+	-L${CBFLIB} -L${BASELIB} -L${BUILDLIB} -Ilz4 \
+	eiger2cbf.c \
+	lz4/lz4.c lz4/h5zlz4.c \
+	bitshuffle/bshuf_h5filter.c \
+	bitshuffle/bshuf_h5plugin.c \
+	bitshuffle/bitshuffle.c \
+	-l hdf5_hl \
+	-l hdf5 \
+	-lcbf -lm -lpthread -lz -ldl
+
+clean: 
+	rm -f *.o
