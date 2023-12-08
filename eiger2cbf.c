@@ -53,7 +53,7 @@ void register_filters() {
 int main(int argc, char **argv) {
   cbf_handle cbf;
   char header[4096] = {};
-  int xpixels = -1, ypixels = -1, beamx = -1, beamy = -1, nimages = -1, depth = -1, countrate_cutoff = -1;
+  int xpixels = -1, ypixels = -1, beamx = -1, beamy = -1, nimages = -1, depth = -1, countrate_cutoff = -1, ntrigger=1;
   int from = -1, to = -1;
   int ret;
   double pixelsize = -1, wavelength = -1, distance = -1, count_time = -1, frame_time = -1, osc_width = -1, osc_start = -9999, thickness = -1;
@@ -84,12 +84,17 @@ int main(int argc, char **argv) {
   }
 
   H5LTread_dataset_int(hdf, "/entry/instrument/detector/detectorSpecific/nimages", &nimages);
+  herr_t status = H5LTread_dataset_int(hdf, "/entry/instrument/detector/detectorSpecific/ntriggera", &ntrigger);
+
+
   if (argc == 2) {
-    printf("%d\n", nimages);
+    printf("nimages=%d ntrigger=%d total_images=%d\n", nimages, ntrigger, ntrigger*nimages);
     H5Fclose(hdf);
     return 0;
   }
-  
+  nimages = nimages * ntrigger;
+
+
   ret = sscanf(argv[2], "%d:%d", &from, &to);
   if (ret == 0) {
     fprintf(stderr, "Failed to parse output frame number(s).");
