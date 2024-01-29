@@ -90,7 +90,7 @@ int main(int argc, char **argv)
 
   int opt;
   char *prefix = NULL;
-  while ((opt = getopt(argc, argv, "s:e:p:x")) != -1)
+  while ((opt = getopt(argc, argv, "s:e:p:xh")) != -1)
   {
     switch (opt)
     {
@@ -105,18 +105,26 @@ int main(int argc, char **argv)
       break;
     case 'x':
       renumber = -1; // disable renumbering
+      fprintf(stderr, "renumbering based on angle disabled\n");
       break;
-    case '?':
+    case 'h':
       fprintf(stderr, "Usage: %s -s start -e end -p prefix master_file\n", argv[0]);
       exit(EXIT_FAILURE);
     }
   }
 
   char *master_file = argv[optind];
-  printf("Positional Argument %d: %s\n", optind, argv[optind]);
+  if (master_file == NULL) {
+      fprintf(stderr, "Usage: %s -s start -e end -p prefix master_file\n", argv[0]);
+      exit(EXIT_FAILURE);
+  }
+  printf("master file: %s\n", master_file);
+
+
+
   if (prefix == NULL)
   {
-    char *filename = extractFilename(master_file);
+    const char *filename = extractFilename(master_file);
     char *location = strstr(filename, "master.");
 
     int prefix_len = location - filename;
