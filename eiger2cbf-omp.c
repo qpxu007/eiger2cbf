@@ -38,7 +38,8 @@ gcc -std=c99 -o eiger2cbf -g \
 #include "stdlib.h"
 #include "string.h"
 #include "getopt.h"
-#include <unistd.h>
+#include "unistd.h"
+#include "omp.h"
 
 #include "cbf.h"
 #include "cbf_simple.h"
@@ -73,11 +74,8 @@ const char *extractFilename(const char *path)
 
 int main(int argc, char **argv)
 {
-  cbf_handle cbf;
-  char header[4096] = {};
   int xpixels = -1, ypixels = -1, beamx = -1, beamy = -1, nimages = -1, depth = -1, countrate_cutoff = -1, ntrigger = 1;
   int from = -1, to = -1;
-  int ret;
   double pixelsize = -1, wavelength = -1, distance = -1, count_time = -1, frame_time = -1, osc_width = -1, osc_start = -9999, thickness = -1;
   char detector_sn[256] = {}, description[256] = {}, version[256] = {};
   char renumber = 1;
@@ -87,7 +85,6 @@ int main(int argc, char **argv)
   fprintf(stderr, "EIGER HDF5 to CBF converter (version 160530 gmca mod)\n");
   fprintf(stderr, " written by Takanori Nakane\n");
   fprintf(stderr, " see https://github.com/biochem-fan/eiger2cbf for details.\n\n");
-
 
   int opt;
   char *prefix = NULL;
@@ -115,13 +112,12 @@ int main(int argc, char **argv)
   }
 
   char *master_file = argv[optind];
-  if (master_file == NULL || access(master_file, F_OK) == -1)  {
-      fprintf(stderr, "Usage: %s -s start -e end -p prefix master_file\n", argv[0]);
-      exit(EXIT_FAILURE);
-  } 
+  if (master_file == NULL || access(master_file, F_OK) == -1)
+  {
+    fprintf(stderr, "Usage: %s -s start -e end -p prefix master_file\n", argv[0]);
+    exit(EXIT_FAILURE);
+  }
   printf("master file: %s\n", master_file);
-
-
 
   if (prefix == NULL)
   {
@@ -411,6 +407,8 @@ int main(int argc, char **argv)
 
   fprintf(stderr, "\nFile analysis completed.\n\n");
   int frame;
+
+#pragma omp parallel for 
   for (frame = from; frame <= to; frame++)
   {
     fprintf(stderr, "Converting frame %d (%d / %d)\n", frame, frame - from + 1, to - from + 1);
@@ -424,6 +422,17 @@ int main(int argc, char **argv)
       fprintf(stderr, " oscillation start not defined. \"Start_angle\" field in the output is set to 0!\n");
       osc_start = osc_width * frame; // old firmware
     }
+
+    int modified_frame = frame;
+    if (renumber == 1 && osc_width >= 1e-6)
+    {
+      modified_frame = (int)round((osc_start - angles[0]) / osc_width + 1);
+      fprintf(stderr, "modified frame number: %i \n", modified_frame);
+    }
+
+    char filename[4096];
+    snprintf(filename, 4096, "%s%06d.cbf", prefix, modified_frame);
+    fprintf(stderr, "out filename %s.\n", filename);
 
     if (frame > nimages)
     {
@@ -462,17 +471,16 @@ int main(int argc, char **argv)
     //            frame, block_number, frame_in_block + 1);
 
     snprintf(data_name, 20, "data_%06d", block_number);
+    char err_msg[4096] = "";
     data = H5Dopen2(group, data_name, H5P_DEFAULT);
     dataspace = H5Dget_space(data);
     if (data < 0)
     {
-      fprintf(stderr, "failed to open /entry/%s\n", data_name);
-      return -1;
+      sprintf(err_msg, "failed to open /entry/%s\n", data_name);
     }
     if (H5Sget_simple_extent_ndims(dataspace) != 3)
     {
-      fprintf(stderr, "Dimension of /entry/%s is not 3!\n", data_name);
-      return -1;
+      sprintf(err_msg, "Dimension of /entry/%s is not 3!\n", data_name);
     }
 
     // Get the frame
@@ -483,51 +491,43 @@ int main(int argc, char **argv)
     hid_t memspace = H5Screate_simple(3, dims, NULL);
     if (memspace < 0)
     {
-      fprintf(stderr, "failed to create memspace\n");
-      return -1;
+      sprintf(err_msg, "failed to create memspace\n");
     }
 
-    ret = H5Sselect_hyperslab(dataspace, H5S_SELECT_SET, offset_in, NULL,
+    int ret = H5Sselect_hyperslab(dataspace, H5S_SELECT_SET, offset_in, NULL,
                               count, NULL);
     if (ret < 0)
     {
-      fprintf(stderr, "select_hyperslab for file failed\n");
-      return -1;
+      sprintf(err_msg, "select_hyperslab for file failed\n");
     }
     ret = H5Sselect_hyperslab(memspace, H5S_SELECT_SET, offset_out, NULL,
                               count, NULL);
     if (ret < 0)
     {
-      fprintf(stderr, "select_hyperslab for memory failed\n");
-      return -1;
+      sprintf(err_msg, "select_hyperslab for memory failed\n");
     }
     ret = H5Dread(data, H5T_NATIVE_UINT, memspace, dataspace, H5P_DEFAULT, buf);
     if (ret < 0)
     {
-      fprintf(stderr, "H5Dread for image failed. Wrong frame number?\n");
-      return -1;
+      sprintf(err_msg, "H5Dread for image failed. Wrong frame number? frame=%d\n", frame);
     }
+
     H5Sclose(dataspace);
     H5Sclose(memspace);
     H5Dclose(data);
 
+    if (strlen(err_msg) > 0)
+    {
+      fprintf(stderr, "--Error--: %s", err_msg);
+    }
+
     /////////////////////////////////////////////////////////////////
     // Reading done. Here output starts...
 
-    char filename[4096];
-
-    int modified_frame = frame;
-    if (renumber == 1 && osc_width >= 1e-6)
-    {
-      modified_frame = (int)round((osc_start - angles[0]) / osc_width + 1);
-      fprintf(stderr, "modified frame number: %i \n", modified_frame);
-    }
-
-    snprintf(filename, 4096, "%s%06d.cbf", prefix, modified_frame);
-    fprintf(stderr, "out filename %s.\n", filename);
     FILE *fh = fopen(filename, "wb");
 
     // create a CBF
+    cbf_handle cbf;
     cbf_make_handle(&cbf);
     cbf_new_datablock(cbf, "image_1");
 
@@ -570,7 +570,6 @@ int main(int argc, char **argv)
                                   ypixels,
                                   0,
                                   0); // padding
-
     cbf_write_file(cbf, fh, 1, CBF, MSG_DIGEST | MIME_HEADERS | PAD_4K, 0);
     // no need to fclose() here as the 3rd argument "readable" is 1
     cbf_free_handle(cbf);
