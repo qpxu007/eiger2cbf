@@ -78,7 +78,7 @@ int main(int argc, char **argv)
   int from = -1, to = -1;
   double pixelsize = -1, wavelength = -1, distance = -1, count_time = -1, frame_time = -1, osc_width = -1, osc_start = -9999, thickness = -1;
   char detector_sn[256] = {}, description[256] = {}, version[256] = {};
-  char renumber = 1;
+  bool renumber = true, debug=false;
 
   hid_t hdf;
 
@@ -88,7 +88,7 @@ int main(int argc, char **argv)
 
   int opt;
   char *prefix = NULL;
-  while ((opt = getopt(argc, argv, "s:e:p:xh")) != -1)
+  while ((opt = getopt(argc, argv, "s:e:p:xhd")) != -1)
   {
     switch (opt)
     {
@@ -104,6 +104,9 @@ int main(int argc, char **argv)
     case 'x':
       renumber = -1; // disable renumbering
       fprintf(stderr, "renumbering based on angle disabled\n");
+      break;
+    case 'd':
+      debug = true;
       break;
     case 'h':
       fprintf(stderr, "Usage: %s -s start -e end -p prefix master_file\n", argv[0]);
@@ -408,18 +411,18 @@ int main(int argc, char **argv)
   fprintf(stderr, "\nFile analysis completed.\n\n");
   int frame;
 
-#pragma omp parallel for num_threads(32) private(hdf, data, dataspace, data_name, frame, osc_start) shared(angles, buf_signed, buf)
+#pragma omp parallel for num_threads(8) private(hdf, data, dataspace, data_name, frame, osc_start) shared(angles, buf_signed, buf, debug)
   for (frame = from; frame <= to; frame++)
   {
-    fprintf(stderr, "Converting frame %d (%d / %d)\n", frame, frame - from + 1, to - from + 1);
+    if (debug) fprintf(stderr, "Converting frame %d (%d / %d)\n", frame, frame - from + 1, to - from + 1);
     if (angles[0] != -9999)
     {
       osc_start = angles[frame - 1];
-      fprintf(stderr, " /entry/sample/goniometer/omega[%d] = %.3f %.2f(1-indexed)\n", frame, osc_start, angles[frame-1]);
+      if (debug) fprintf(stderr, " /entry/sample/goniometer/omega[%d] = %.3f %.2f(1-indexed)\n", frame, osc_start, angles[frame-1]);
     }
     else
     {
-      fprintf(stderr, " oscillation start not defined. \"Start_angle\" field in the output is set to 0!\n");
+      if (debug) fprintf(stderr, " oscillation start not defined. \"Start_angle\" field in the output is set to 0!\n");
       osc_start = osc_width * frame; // old firmware
     }
 
@@ -431,7 +434,7 @@ int main(int argc, char **argv)
 
     char filename[4096];
     snprintf(filename, 4096, "%s%06d.cbf", prefix, modified_frame);
-    fprintf(stderr, "frame=%i --> %i  osc=%.3f outfile=%s\n", frame, modified_frame, osc_start, filename);
+    if (debug) fprintf(stderr, "frame=%i --> %i  osc=%.3f outfile=%s\n", frame, modified_frame, osc_start, filename);
 
     if (frame > nimages)
     {
@@ -515,7 +518,7 @@ int main(int argc, char **argv)
     H5Sclose(memspace);
     H5Dclose(data);
 
-    if (strlen(err_msg) > 0)
+    if (strlen(err_msg) > 0 && debug)
     {
       fprintf(stderr, "--Error--: %s", err_msg);
     }
