@@ -408,14 +408,14 @@ int main(int argc, char **argv)
   fprintf(stderr, "\nFile analysis completed.\n\n");
   int frame;
 
-#pragma omp parallel for 
+#pragma omp parallel for num_threads(32) private(hdf, data, dataspace, data_name, frame, osc_start) shared(angles, buf_signed, buf)
   for (frame = from; frame <= to; frame++)
   {
     fprintf(stderr, "Converting frame %d (%d / %d)\n", frame, frame - from + 1, to - from + 1);
     if (angles[0] != -9999)
     {
       osc_start = angles[frame - 1];
-      fprintf(stderr, " /entry/sample/goniometer/omega[%d] = %.3f (1-indexed)\n", frame, osc_start);
+      fprintf(stderr, " /entry/sample/goniometer/omega[%d] = %.3f %.2f(1-indexed)\n", frame, osc_start, angles[frame-1]);
     }
     else
     {
@@ -427,12 +427,11 @@ int main(int argc, char **argv)
     if (renumber == 1 && osc_width >= 1e-6)
     {
       modified_frame = (int)round((osc_start - angles[0]) / osc_width + 1);
-      fprintf(stderr, "modified frame number: %i \n", modified_frame);
     }
 
     char filename[4096];
     snprintf(filename, 4096, "%s%06d.cbf", prefix, modified_frame);
-    fprintf(stderr, "out filename %s.\n", filename);
+    fprintf(stderr, "frame=%i --> %i  osc=%.3f outfile=%s\n", frame, modified_frame, osc_start, filename);
 
     if (frame > nimages)
     {
@@ -495,7 +494,7 @@ int main(int argc, char **argv)
     }
 
     int ret = H5Sselect_hyperslab(dataspace, H5S_SELECT_SET, offset_in, NULL,
-                              count, NULL);
+                                  count, NULL);
     if (ret < 0)
     {
       sprintf(err_msg, "select_hyperslab for file failed\n");

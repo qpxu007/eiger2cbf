@@ -74,7 +74,6 @@ const char *extractFilename(const char *path)
 int main(int argc, char **argv)
 {
   cbf_handle cbf;
-  char header[4096] = {};
   int xpixels = -1, ypixels = -1, beamx = -1, beamy = -1, nimages = -1, depth = -1, countrate_cutoff = -1, ntrigger = 1;
   int from = -1, to = -1;
   int ret;
