@@ -19,6 +19,7 @@ all:
 	${HDF5LIB}/libhdf5.a \
 	-lcbf -lm -lpthread -lz -ldl
 
+omp:	
 
 	${CC} -std=c99 -o eiger2cbf-omp  -fopenmp -g  \
 	-I${CBFINC} -I/usr/include/hdf5/serial/ -Wl,--copy-dt-needed-entries \
@@ -32,6 +33,11 @@ all:
 	${HDF5LIB}/libhdf5.a \
 	-lcbf -lm -lpthread -lz -ldl 
 
+test:
+	@time ./eiger2cbf-omp -d -s 1 -e 32 /mnt/beegfs/testdata/OUTPUT/metadata_tests/standard/insu6_1_master.h5
+	for f in $$(ls ins*cbf); do \
+		diff "$$f" "ref/$$f" ; \
+	done
 
 clean: 
 	rm -f *.o minicbf

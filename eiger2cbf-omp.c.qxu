@@ -412,7 +412,7 @@ int main(int argc, char **argv)
   fprintf(stderr, "\nFile analysis completed.\n\n");
   int frame;
 
-#pragma omp parallel for private(data, dataspace, data_name, frame, osc_start) //shared(group, entry, angles, buf_signed, buf, debug)
+#pragma omp parallel for private(hdf, data, dataspace, data_name, frame, osc_start) shared(angles, buf_signed, buf, debug)
   for (frame = from; frame <= to; frame++)
   {
     if (debug) fprintf(stderr, "Converting frame %d (%d / %d)\n", frame, frame - from + 1, to - from + 1);
