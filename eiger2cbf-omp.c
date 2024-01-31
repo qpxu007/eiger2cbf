@@ -76,9 +76,9 @@ int main(int argc, char **argv)
 {
   int xpixels = -1, ypixels = -1, beamx = -1, beamy = -1, nimages = -1, depth = -1, countrate_cutoff = -1, ntrigger = 1;
   int from = -1, to = -1;
-  double pixelsize = -1, wavelength = -1, distance = -1, count_time = -1, frame_time = -1, osc_width = -1, osc_start = -9999, thickness = -1;
+  double pixelsize = -1, wavelength = -1, distance = -1, count_time = -1, frame_time = -1, osc_width = -1, thickness = -1;
   char detector_sn[256] = {}, description[256] = {}, version[256] = {};
-  bool renumber = true, debug=false;
+  bool renumber = true, debug = false;
 
   hid_t hdf;
 
@@ -326,8 +326,8 @@ int main(int argc, char **argv)
     fprintf(stderr, " WARNING: oscillation width was not defined. \"Start_angle\" field in the output is set to 0!\n");
     osc_width = 0;
   }
-  //unsigned int *buf = (unsigned int *)malloc(sizeof(unsigned int) * xpixels * ypixels);
-  //signed int *buf_signed = (signed int *)malloc(sizeof(signed int) * xpixels * ypixels);
+  // unsigned int *buf = (unsigned int *)malloc(sizeof(unsigned int) * xpixels * ypixels);
+  // signed int *buf_signed = (signed int *)malloc(sizeof(signed int) * xpixels * ypixels);
   signed int *pixel_mask = (signed int *)malloc(sizeof(signed int) * xpixels * ypixels);
 
   // TODO: Is it always in omega?
@@ -407,18 +407,22 @@ int main(int argc, char **argv)
   fprintf(stderr, "\nFile analysis completed.\n\n");
   int frame;
 
-#pragma omp parallel for private(data, dataspace, data_name, frame, osc_start) //shared(group, entry, angles, buf_signed, buf, debug)
+#pragma omp parallel for private(data, dataspace, data_name, frame) // shared(group, entry, angles, buf_signed, buf, debug)
   for (frame = from; frame <= to; frame++)
   {
-    if (debug) fprintf(stderr, "Converting frame %d (%d / %d)\n", frame, frame - from + 1, to - from + 1);
+    double osc_start = -9999.0;
+    if (debug)
+      fprintf(stderr, "Converting frame %d (%d / %d)\n", frame, frame - from + 1, to - from + 1);
     if (angles[0] != -9999)
     {
       osc_start = angles[frame - 1];
-      if (debug) fprintf(stderr, " /entry/sample/goniometer/omega[%d] = %.3f %.2f(1-indexed)\n", frame, osc_start, angles[frame-1]);
+      if (debug)
+        fprintf(stderr, " /entry/sample/goniometer/omega[%d] = %.3f %.2f(1-indexed)\n", frame, osc_start, angles[frame - 1]);
     }
     else
     {
-      if (debug) fprintf(stderr, " oscillation start not defined. \"Start_angle\" field in the output is set to 0!\n");
+      if (debug)
+        fprintf(stderr, " oscillation start not defined. \"Start_angle\" field in the output is set to 0!\n");
       osc_start = osc_width * frame; // old firmware
     }
 
@@ -430,7 +434,8 @@ int main(int argc, char **argv)
 
     char filename[4096];
     snprintf(filename, 4096, "%s%06d.cbf", prefix, modified_frame);
-    if (debug) fprintf(stderr, "frame=%i --> %i  osc=%.3f outfile=%s\n", frame, modified_frame, osc_start, filename);
+    if (debug)
+      fprintf(stderr, "frame=%i --> %i  osc=%.3f outfile=%s\n", frame, modified_frame, osc_start, filename);
 
     if (frame > nimages)
     {
@@ -512,8 +517,6 @@ int main(int argc, char **argv)
       sprintf(err_msg, "Failed to allocate image buffer.\n");
     }
 
-
-
     ret = H5Dread(data, H5T_NATIVE_UINT, memspace, dataspace, H5P_DEFAULT, buf);
     if (ret < 0)
     {
@@ -524,65 +527,68 @@ int main(int argc, char **argv)
     H5Sclose(memspace);
     H5Dclose(data);
 
-    if (strlen(err_msg) > 0 && debug)
+    if (strlen(err_msg) > 0)
     {
       fprintf(stderr, "--Error--: %s", err_msg);
     }
-
-    /////////////////////////////////////////////////////////////////
-    // Reading done. Here output starts...
-
-    FILE *fh = fopen(filename, "wb");
-
-    // create a CBF
-    cbf_handle cbf;
-    cbf_make_handle(&cbf);
-    cbf_new_datablock(cbf, "image_1");
-
-    // put a miniCBF header
-    cbf_new_category(cbf, "array_data");
-    cbf_new_column(cbf, "header_convention");
-    cbf_set_value(cbf, "SLS_1.0");
-    cbf_new_column(cbf, "header_contents");
-    cbf_set_value(cbf, header_content);
-
-    // put the image
-    cbf_new_category(cbf, "array_data");
-    cbf_new_column(cbf, "data");
-    int i;
-    for (i = 0; i < xpixels * ypixels; i++)
+    else
     {
-      if ((pixel_mask[0] != -9999 && pixel_mask[i] == 1) || // the pixel mask is available
-          (pixel_mask[0] == -9999 && buf[i] == error_val))
-      { // not available
-        buf_signed[i] = -1;
-      }
-      else if (pixel_mask[0] != -9999 && pixel_mask[i] > 1)
-      { // the pixel mask is 2, 4, 8, 16
-        buf_signed[i] = -2;
-      }
-      else
+
+      /////////////////////////////////////////////////////////////////
+      // Reading done. Here output starts...
+
+      FILE *fh = fopen(filename, "wb");
+
+      // create a CBF
+      cbf_handle cbf;
+      cbf_make_handle(&cbf);
+      cbf_new_datablock(cbf, "image_1");
+
+      // put a miniCBF header
+      cbf_new_category(cbf, "array_data");
+      cbf_new_column(cbf, "header_convention");
+      cbf_set_value(cbf, "SLS_1.0");
+      cbf_new_column(cbf, "header_contents");
+      cbf_set_value(cbf, header_content);
+
+      // put the image
+      cbf_new_category(cbf, "array_data");
+      cbf_new_column(cbf, "data");
+      int i;
+      for (i = 0; i < xpixels * ypixels; i++)
       {
-        buf_signed[i] = buf[i];
+        if ((pixel_mask[0] != -9999 && pixel_mask[i] == 1) || // the pixel mask is available
+            (pixel_mask[0] == -9999 && buf[i] == error_val))
+        { // not available
+          buf_signed[i] = -1;
+        }
+        else if (pixel_mask[0] != -9999 && pixel_mask[i] > 1)
+        { // the pixel mask is 2, 4, 8, 16
+          buf_signed[i] = -2;
+        }
+        else
+        {
+          buf_signed[i] = buf[i];
+        }
       }
+      cbf_set_integerarray_wdims_fs(cbf,
+                                    CBF_BYTE_OFFSET,
+                                    1, // binary id
+                                    buf_signed,
+                                    sizeof(int),
+                                    1, // signed?
+                                    xpixels * ypixels,
+                                    "little_endian",
+                                    xpixels,
+                                    ypixels,
+                                    0,
+                                    0); // padding
+      cbf_write_file(cbf, fh, 1, CBF, MSG_DIGEST | MIME_HEADERS | PAD_4K, 0);
+      // no need to fclose() here as the 3rd argument "readable" is 1
+      cbf_free_handle(cbf);
+      free(buf);
+      free(buf_signed);
     }
-    cbf_set_integerarray_wdims_fs(cbf,
-                                  CBF_BYTE_OFFSET,
-                                  1, // binary id
-                                  buf_signed,
-                                  sizeof(int),
-                                  1, // signed?
-                                  xpixels * ypixels,
-                                  "little_endian",
-                                  xpixels,
-                                  ypixels,
-                                  0,
-                                  0); // padding
-    cbf_write_file(cbf, fh, 1, CBF, MSG_DIGEST | MIME_HEADERS | PAD_4K, 0);
-    // no need to fclose() here as the 3rd argument "readable" is 1
-    cbf_free_handle(cbf);
-    free(buf);
-    free(buf_signed);
   }
 
   H5Gclose(group);

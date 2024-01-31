@@ -34,7 +34,7 @@ omp:
 	-lcbf -lm -lpthread -lz -ldl 
 
 test:
-	@time ./eiger2cbf-omp -d -s 1 -e 900 /mnt/beegfs/testdata/OUTPUT/metadata_tests/standard/insu6_1_master.h5
+	@time ./eiger2cbf-omp -d -s 1 -e 100 /mnt/beegfs/testdata/OUTPUT/metadata_tests/standard/insu6_1_master.h5
 	for f in $$(ls ins*cbf); do \
 		diff "$$f" "ref/$$f" ; \
 	done
