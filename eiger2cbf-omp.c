@@ -326,14 +326,9 @@ int main(int argc, char **argv)
     fprintf(stderr, " WARNING: oscillation width was not defined. \"Start_angle\" field in the output is set to 0!\n");
     osc_width = 0;
   }
-  unsigned int *buf = (unsigned int *)malloc(sizeof(unsigned int) * xpixels * ypixels);
-  signed int *buf_signed = (signed int *)malloc(sizeof(signed int) * xpixels * ypixels);
+  //unsigned int *buf = (unsigned int *)malloc(sizeof(unsigned int) * xpixels * ypixels);
+  //signed int *buf_signed = (signed int *)malloc(sizeof(signed int) * xpixels * ypixels);
   signed int *pixel_mask = (signed int *)malloc(sizeof(signed int) * xpixels * ypixels);
-  if (buf == NULL || buf_signed == NULL || pixel_mask == NULL)
-  {
-    fprintf(stderr, "Failed to allocate image buffer.\n");
-    return -1;
-  }
 
   // TODO: Is it always in omega?
   int bufsize = (nimages < 100000) ? 100000 : nimages;
@@ -509,6 +504,16 @@ int main(int argc, char **argv)
     {
       sprintf(err_msg, "select_hyperslab for memory failed\n");
     }
+
+    unsigned int *buf = (unsigned int *)malloc(sizeof(unsigned int) * xpixels * ypixels);
+    signed int *buf_signed = (signed int *)malloc(sizeof(signed int) * xpixels * ypixels);
+    if (buf == NULL || buf_signed == NULL || pixel_mask == NULL)
+    {
+      sprintf(err_msg, "Failed to allocate image buffer.\n");
+    }
+
+
+
     ret = H5Dread(data, H5T_NATIVE_UINT, memspace, dataspace, H5P_DEFAULT, buf);
     if (ret < 0)
     {
@@ -576,13 +581,13 @@ int main(int argc, char **argv)
     cbf_write_file(cbf, fh, 1, CBF, MSG_DIGEST | MIME_HEADERS | PAD_4K, 0);
     // no need to fclose() here as the 3rd argument "readable" is 1
     cbf_free_handle(cbf);
+    free(buf);
+    free(buf_signed);
   }
 
   H5Gclose(group);
   H5Fclose(hdf);
 
-  free(buf);
-  free(buf_signed);
   free(angles);
 
   fprintf(stderr, "\nAll done!\n");
